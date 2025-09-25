@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DeepDoc Investigator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff-match-patch/20121119/diff_match_patch.js" onerror="console.error('Failed to load diff_match_patch from CDN')"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding: 40px 0;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .controls-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .form-group input[type="text"] {
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: #f7fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .file-input-label:hover {
+            background: #edf2f7;
+            border-color: #667eea;
+        }
+
+        .file-input-label.has-file {
+            background: #e6fffa;
+            border-color: #38b2ac;
+            color: #234e52;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .metrics {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .metrics.show {
+            display: block;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .metric-card {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #718096;
+            font-weight: 600;
+        }
+
+        .viewer-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            min-height: 400px;
+        }
+
+        .viewer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            height: 100%;
+        }
+
+        .text-pane {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .text-pane h3 {
+            margin-bottom: 15px;
+            color: #4a5568;
+            font-size: 1.3rem;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .text-content {
+            flex: 1;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-y: auto;
+            max-height: 500px;
+            white-space: pre-wrap;
+        }
+
+        .text-content.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0aec0;
+            font-style: italic;
+            background: #f7fafc;
+        }
+
+        .changes-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .changes-section.show {
+            display: block;
+        }
+
+        .changes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .changes-header h3 {
+            color: #4a5568;
+            font-size: 1.5rem;
+        }
+
+        .change-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .change-item:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .change-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+        }
+
+        .change-content {
+            padding: 20px;
+        }
+
+        .change-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .change-stat {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .change-stat-value {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+
+        .change-stat-label {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 2px;
+        }
+
+        .change-preview {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .diff-addition {
+            background-color: #c6f6d5;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .diff-deletion {
+            background-color: #fed7d7;
+            padding: 2px 4px;
+            border-radius: 3px;
+            text-decoration: line-through;
+        }
+
+        .diff-neutral {
+            background-color: transparent;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background-color: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .alert-error {
+            background-color: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+
+        @media (max-width: 768px) {
+            .viewer-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔍 DeepDoc Investigator</h1>
+            <p>Advanced PDF Comparison & Forgery Detection</p>
+        </header>
+
+        <section class="controls-section">
+            <div class="controls-grid">
+                <div class="form-group">
+                    <label for="docId">Document ID</label>
+                    <input type="text" id="docId" value="my_doc" placeholder="Enter document identifier">
+                </div>
+                
+                <div class="form-group">
+                    <label for="origPdf">Original PDF Document</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="origPdf" accept=".pdf">
+                        <label for="origPdf" class="file-input-label" id="origPdfLabel">
+                            📁 Choose Original PDF
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <button id="btnIngest" class="btn btn-primary">
+                        📤 Ingest Original
+                    </button>
+                </div>
+            </div>
+            
+            <div class="controls-grid" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label for="modPdf">Modified PDF Document</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="modPdf" accept=".pdf">
+                        <label for="modPdf" class="file-input-label" id="modPdfLabel">
+                            📁 Choose Modified PDF
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <button id="btnCompare" class="btn btn-success">
+                        🔬 Compare Documents
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <div id="alertContainer"></div>
+
+        <div class="metrics" id="metricsSection">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="percentChanged">0%</div>
+                    <div class="metric-label">Text Changed</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="changedChunks">0</div>
+                    <div class="metric-label">Flagged Chunks</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="totalChunks">0</div>
+                    <div class="metric-label">Total Chunks</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="changeSummary">-</div>
+                    <div class="metric-label">Change Level</div>
+                </div>
+            </div>
+        </div>
+
+        <section class="viewer-section">
+            <div class="viewer-grid">
+                <div class="text-pane">
+                    <h3>📄 Original Document</h3>
+                    <div class="text-content empty" id="origText">
+                        No document loaded. Upload and ingest an original PDF first.
+                    </div>
+                </div>
+                <div class="text-pane">
+                    <h3>📝 Modified Document (with differences)</h3>
+                    <div class="text-content empty" id="modText">
+                        No comparison performed yet. Upload a modified PDF and click Compare.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="changes-section" id="changesSection">
+            <div class="changes-header">
+                <h3>🚨 Detected Changes</h3>
+                <button id="downloadReport" class="btn btn-primary">
+                    📊 Download Report
+                </button>
+            </div>
+            <div id="changesList"></div>
+        </section>
+    </div>
+
+    <script>
+        // Utility functions
+        const getEl = id => document.getElementById(id);
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showAlert(message, type = 'success') {
+            const alertContainer = getEl('alertContainer');
+            const alertEl = document.createElement('div');
+            alertEl.className = `alert alert-${type}`;
+            alertEl.textContent = message;
+            
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertEl);
+            
+            setTimeout(() => {
+                alertEl.remove();
+            }, 5000);
+        }
+
+        function setLoading(button, isLoading) {
+            if (isLoading) {
+                button.disabled = true;
+                const originalText = button.innerHTML;
+                button.dataset.originalText = originalText;
+                button.innerHTML = '<div class="spinner"></div> Processing...';
+            } else {
+                button.disabled = false;
+                button.innerHTML = button.dataset.originalText || button.innerHTML;
+            }
+        }
+
+        // File input handlers
+        getEl('origPdf').addEventListener('change', function(e) {
+            const label = getEl('origPdfLabel');
+            if (e.target.files[0]) {
+                label.textContent = `📁 ${e.target.files[0].name}`;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = '📁 Choose Original PDF';
+                label.classList.remove('has-file');
+            }
+        });
+
+        getEl('modPdf').addEventListener('change', function(e) {
+            const label = getEl('modPdfLabel');
+            if (e.target.files[0]) {
+                label.textContent = `📁 ${e.target.files[0].name}`;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = '📁 Choose Modified PDF';
+                label.classList.remove('has-file');
+            }
+        });
+
+        // Simple diff implementation as fallback
+        function simpleDiff(oldText, newText) {
+            const oldLines = oldText.split('\n');
+            const newLines = newText.split('\n');
+            let result = '';
+            
+            const maxLines = Math.max(oldLines.length, newLines.length);
+            
+            for (let i = 0; i < maxLines; i++) {
+                const oldLine = oldLines[i] || '';
+                const newLine = newLines[i] || '';
+                
+                if (oldLine === newLine) {
+                    result += `<span class="diff-neutral">${escapeHtml(newLine)}\n</span>`;
+                } else if (!oldLine && newLine) {
+                    result += `<span class="diff-addition">${escapeHtml(newLine)}\n</span>`;
+                } else if (oldLine && !newLine) {
+                    result += `<span class="diff-deletion">${escapeHtml(oldLine)}\n</span>`;
+                } else {
+                    result += `<span class="diff-deletion">${escapeHtml(oldLine)}\n</span>`;
+                    result += `<span class="diff-addition">${escapeHtml(newLine)}\n</span>`;
+                }
+            }
+            
+            return result;
+        }
+
+        // Create diff HTML with fallback
+        function createDiffHtml(oldText, newText) {
+            try {
+                // Try to use diff_match_patch if available
+                if (typeof diff_match_patch !== 'undefined') {
+                    const dmp = new diff_match_patch();
+                    const diffs = dmp.diff_main(oldText, newText);
+                    dmp.diff_cleanupSemantic(diffs);
+
+                    return diffs.map(diff => {
+                        const [operation, text] = diff;
+                        const escapedText = escapeHtml(text);
+                        
+                        switch (operation) {
+                            case 0: // Equal
+                                return `<span class="diff-neutral">${escapedText}</span>`;
+                            case -1: // Deletion
+                                return `<span class="diff-deletion">${escapedText}</span>`;
+                            case 1: // Addition
+                                return `<span class="diff-addition">${escapedText}</span>`;
+                            default:
+                                return escapedText;
+                        }
+                    }).join('');
+                } else {
+                    console.warn('diff_match_patch not available, using simple diff');
+                    return simpleDiff(oldText, newText);
+                }
+            } catch (error) {
+                console.error('Error creating diff:', error);
+                return simpleDiff(oldText, newText);
+            }
+        }
+
+        // Ingest PDF function
+        async function ingestPDF(file, docId) {
+            const btnIngest = getEl('btnIngest');
+            setLoading(btnIngest, true);
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('doc_id', docId);
+
+                const response = await fetch('/ingest', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Document "${result.doc_id}" ingested successfully! (${result.chars} characters)`, 'success');
+                    getEl('docId').value = result.doc_id;
+                    
+                    // Load and display the original text
+                    const rawResponse = await fetch(`/raw/${encodeURIComponent(result.doc_id)}`);
+                    const rawData = await rawResponse.json();
+                    
+                    const origTextEl = getEl('origText');
+                    origTextEl.textContent = rawData.text;
+                    origTextEl.classList.remove('empty');
+                } else {
+                    showAlert(result.error || 'Error during ingestion', 'error');
+                }
+            } catch (error) {
+                showAlert(`Network error: ${error.message}`, 'error');
+            } finally {
+                setLoading(btnIngest, false);
+            }
+        }
+
+        // Compare PDF function
+        async function comparePDF(docId, file) {
+            const btnCompare = getEl('btnCompare');
+            setLoading(btnCompare, true);
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('doc_id', docId);
+
+                const response = await fetch('/compare', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    showAlert(result.error || 'Error during comparison', 'error');
+                    return;
+                }
+
+                // Extract text from PDF for comparison
+                const extractTextResponse = await fetch('/ingest', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                let extractedText = '';
+                if (extractTextResponse.ok) {
+                    const tempResult = await extractTextResponse.json();
+                    const tempTextResponse = await fetch(`/raw/${encodeURIComponent(tempResult.doc_id)}`);
+                    if (tempTextResponse.ok) {
+                        const tempTextData = await tempTextResponse.json();
+                        extractedText = tempTextData.text;
+                    }
+                }
+
+                // Get original text for diff
+                const rawResponse = await fetch(`/raw/${encodeURIComponent(docId)}`);
+                const rawData = await rawResponse.json();
+
+                // Update the UI with actual texts
+                updateMetrics(result);
+                updateViewer(rawData.text, extractedText || 'Could not extract modified text');
+                updateChanges(result);
+
+                showAlert(`Comparison completed! ${result.percent_changed}% changed, ${result.num_changed_chunks} flagged chunks`, 'success');
+
+            } catch (error) {
+                showAlert(`Network error: ${error.message}`, 'error');
+            } finally {
+                setLoading(btnCompare, false);
+            }
+        }
+
+        function updateMetrics(result) {
+            getEl('percentChanged').textContent = `${result.percent_changed}%`;
+            getEl('changedChunks').textContent = result.num_changed_chunks;
+            getEl('totalChunks').textContent = result.total_chunks || 0;
+            getEl('changeSummary').textContent = result.change_summary || 'Unknown';
+            
+            getEl('metricsSection').classList.add('show');
+        }
+
+        function updateViewer(originalText, modifiedText) {
+            const origTextEl = getEl('origText');
+            const modTextEl = getEl('modText');
+            
+            origTextEl.textContent = originalText;
+            origTextEl.classList.remove('empty');
+            
+            // Create diff HTML
+            const diffHtml = createDiffHtml(originalText, modifiedText);
+            modTextEl.innerHTML = diffHtml;
+            modTextEl.classList.remove('empty');
+        }
+
+        function updateChanges(result) {
+            const changesSection = getEl('changesSection');
+            const changesList = getEl('changesList');
+            
+            changesList.innerHTML = '';
+            
+            if (result.changed_chunks && result.changed_chunks.length > 0) {
+                result.changed_chunks.forEach(change => {
+                    const changeEl = document.createElement('div');
+                    changeEl.className = 'change-item';
+                    
+                    changeEl.innerHTML = `
+                        <div class="change-header">
+                            Chunk ${change.index} - ${change.change_type || 'Modified'}
+                        </div>
+                        <div class="change-content">
+                            <div class="change-stats">
+                                <div class="change-stat">
+                                    <div class="change-stat-value">${(change.similarity * 100).toFixed(1)}%</div>
+                                    <div class="change-stat-label">Similarity</div>
+                                </div>
+                                <div class="change-stat">
+                                    <div class="change-stat-value">${change.pred_label ?? 'N/A'}</div>
+                                    <div class="change-stat-label">ML Prediction</div>
+                                </div>
+                                <div class="change-stat">
+                                    <div class="change-stat-value">${change.confidence ? (change.confidence * 100).toFixed(1) + '%' : 'N/A'}</div>
+                                    <div class="change-stat-label">Confidence</div>
+                                </div>
+                                <div class="change-stat">
+                                    <div class="change-stat-value">${change.change_type || 'Modified'}</div>
+                                    <div class="change-stat-label">Type</div>
+                                </div>
+                            </div>
+                            <div class="change-preview">${escapeHtml(change.new_preview || change.old_preview || 'No preview available')}</div>
+                        </div>
+                    `;
+                    
+                    changesList.appendChild(changeEl);
+                });
+                
+                changesSection.classList.add('show');
+            } else {
+                const noChangesEl = document.createElement('div');
+                noChangesEl.className = 'change-item';
+                noChangesEl.innerHTML = `
+                    <div class="change-content">
+                        <p style="text-align: center; color: #4a5568; font-style: italic;">
+                            ✅ No suspicious changes detected in this document.
+                        </p>
+                    </div>
+                `;
+                changesList.appendChild(noChangesEl);
+                changesSection.classList.add('show');
+            }
+
+            // Setup download report functionality
+            getEl('downloadReport').onclick = () => {
+                const dataStr = JSON.stringify(result, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const exportFileDefaultName = `comparison-report-${result.doc_id}-${new Date().toISOString().split('T')[0]}.json`;
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            };
+        }
+
+        // Event listeners
+        getEl('btnIngest').addEventListener('click', () => {
+            const file = getEl('origPdf').files[0];
+            const docId = getEl('docId').value.trim();
+            
+            if (!file) {
+                showAlert('Please select an original PDF file', 'error');
+                return;
+            }
+            
+            if (!docId) {
+                showAlert('Please enter a document ID', 'error');
+                return;
+            }
+            
+            ingestPDF(file, docId);
+        });
+
+        getEl('btnCompare').addEventListener('click', () => {
+            const file = getEl('modPdf').files[0];
+            const docId = getEl('docId').value.trim();
+            
+            if (!file) {
+                showAlert('Please select a modified PDF file', 'error');
+                return;
+            }
+            
+            if (!docId) {
+                showAlert('Please enter a document ID', 'error');
+                return;
+            }
+            
+            comparePDF(docId, file);
+        });
+
+        // Initialize app with library check
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DeepDoc Investigator initialized');
+            
+            // Check if diff_match_patch is available
+            if (typeof diff_match_patch === 'undefined') {
+                console.warn('diff_match_patch library not loaded - using fallback diff implementation');
+                showAlert('Advanced diff library not loaded - using simplified comparison', 'error');
+            } else {
+                console.log('diff_match_patch library loaded successfully');
+            }
+        });
+    </script>
+</body>
+</html>
