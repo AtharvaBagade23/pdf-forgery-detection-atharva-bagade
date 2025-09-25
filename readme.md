@@ -409,7 +409,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/AtharvaBagade23/deepdoc-investigator/issues)
+- **Issues**: [GitHub Issues](https://github.com/AtharvaBagade23/pdf-forgery-detection-atharva-bagade/issues)
 - **Documentation**: This README and inline code comments
 - **Community**: Feel free to fork and contribute!
 
